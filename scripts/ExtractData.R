@@ -18,7 +18,7 @@ strip_html <- function(htmlString) {
   return(gsub("<.*?>", "", htmlString))
 }
 
-# Download all episodes ----
+# Download all episode names ----
 
 all_eps <- c("https://pawpatrol.fandom.com/api.php?action=parse&page=List_of_episodes&prop=wikitext&format=json")
 
@@ -41,6 +41,8 @@ eps <- all_eps %>%
   pull(value)
  
 
+# Create holding tibble for all information ----
+
 full_data <- tibble(title = character(),
                     season = character(),
                     episode = character(),
@@ -55,6 +57,8 @@ full_data <- tibble(title = character(),
                     needs = list(),
                     characters = list()
                     )
+
+# Loop through all episodes and bind data to holding tibble ----
 
 for (i in eps) {
   
@@ -103,7 +107,6 @@ for (i in eps) {
                  characters = list(ep_characters))
   
   full_data <- full_data %>% bind_rows(loop)
-  
   
 }
 

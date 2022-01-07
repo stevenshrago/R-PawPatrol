@@ -1,0 +1,188 @@
+---
+title: "Paw Patrol Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pacman)
+p_load(tidyverse, janitor, glue, extrafont, lubridate, scales)
+data_raw <- readRDS("../data_out/paw_patrol_db.rds")
+
+pup_colours <- c("Zuma" = "darkorange",
+                                 "Chase" = "blue",
+                                 "Everest" = "deepskyblue2",
+                                 "Marshall" = "red2",
+                                 "Rex" = "darkgreen",
+                                 "Robo-Dog" = "dimgrey",
+                                 "Rocky" = "limegreen",
+                                 "Rubble" = "gold",
+                                 "Ryder" = "grey15",
+                                 "Skye" = "hotpink",
+                                 "Tracker" = "chocolate4")
+```
+
+```{r tidying}
+
+data <- data_raw %>%
+  unnest(characters) %>% 
+  mutate(overall = as.numeric(overall),
+         characters = str_replace_all(characters, "Precious['] owner", "Katie"),
+         characters = str_replace_all(characters, "^Cat\\s.*", "Kitten Catastrophe Crew"),
+         season = as.numeric(season))
+
+```
+
+## Appearances
+
+How many times each pup has appeared in the show, cumulatively. 
+
+```{r appearances count}
+appearances <- data %>%
+  select(season, episode, overall, characters) %>%
+  unnest(characters) %>%
+  # filter(characters %in% pups) %>%
+  count(characters) %>%
+  arrange(desc(n)) %>%
+  slice_max(n, n = 30) %>%
+  mutate(characters = factor(characters))
+```
+```{r appearances plot}
+appearances %>% 
+  ggplot(aes(x = reorder(characters, n), y = n)) +
+  geom_col(aes(fill = characters)) +
+  geom_text(aes(label = n, hjust = -0.5), size = 3) +
+  coord_flip() +
+  theme_minimal() +
+  expand_limits(y = c(0,350)) +
+  labs(title = "Number of appearances per character",
+       subtitle = "Top 30 characters by appearances",
+       x = "Characters",
+       y = "Appearances") +
+  scale_fill_manual(values = pup_colours)
+```
+
+
+```{r cumulative appearances}
+
+cumulative <- data %>% 
+  select(overall, characters) %>%
+  filter(characters %in% pups) %>%
+  group_by(characters) %>% 
+  mutate(appearance = 1,
+         cumsum = cumsum(appearance)) %>% 
+  select(overall, characters, cumsum)
+
+dff <- tibble(characters = rep(c("Zuma", "Skye", "Rubble", "Rocky", "Chase", "Marshall", "Ryder", "Robo-Dog", "Everest", "Tracker", "Rex"), times = 369))
+
+df <- tibble(overall = rep(1:369, times = 11)) %>%
+  arrange(overall) %>%
+  bind_cols(dff) %>%
+  left_join(cumulative, by = c("overall", "characters")) %>%
+  mutate(cumsum = if_else(overall == 1 & is.na(cumsum), 0, cumsum)) %>%
+  group_by(characters) %>% 
+  fill(cumsum, .direction = "downup") %>% 
+  ggplot(aes(x = overall, y = cumsum, group = characters)) +
+  geom_line(aes(color = factor(characters))) +
+  theme_minimal() +
+  scale_colour_manual(values = c("Zuma" = "darkorange",
+                                 "Chase" = "blue",
+                                 "Everest" = "deepskyblue2",
+                                 "Marshall" = "red2",
+                                 "Rex" = "darkgreen",
+                                 "Robo-Dog" = "dimgrey",
+                                 "Rocky" = "limegreen",
+                                 "Rubble" = "gold",
+                                 "Ryder" = "grey15",
+                                 "Skye" = "hotpink",
+                                 "Tracker" = "chocolate4")) +
+  labs(title = "Cumulative appearances of the Paw Patrol",
+       x = "Episodes",
+       y = "Appearances (cumulative")
+
+df
+
+
+```
+
+```{r first responders}
+
+pups <- c("Zuma", "Skye", "Rubble", "Rocky", "Chase", "Marshall", "Ryder", "Robo-Dog", "Everest", "Tracker", "Rex")
+
+data_raw %>%
+  unnest(first) %>%
+  mutate(season = as.numeric(season)) %>%
+  select(season, episode, overall, first) %>%
+  count(season, first) %>%
+  left_join(
+    data %>%
+      filter(characters %in% pups) %>%
+      count(season, characters) %>%
+      rename(appearances = n,
+             first = characters),
+    by = c("season", "first")
+  ) %>%
+  mutate(appearances = if_else(appearances < n, n, appearances),
+         perc_first = n/appearances) %>% 
+  arrange(desc(perc_first)) %>% 
+  ggplot(aes(x = season, y = perc_first, group = first)) +
+  geom_line(aes(colour = first)) +
+  scale_color_manual(values = pup_colours, breaks = c(1, 2, 3, 4, 5, 6, 7, 8)) +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8")) +
+  scale_y_continuous(labels = label_percent()) +
+  theme_minimal() +
+  labs(title = "Pups as first reponders per season",
+       subtitle = "Nnmber of times as a first responder as a percentage of total appearances",
+       x = "Season",
+       y = "Percentage of total appearances as a first responder")
+  
+
+
+```
+```{r backup responders}
+pups <- c("Zuma", "Skye", "Rubble", "Rocky", "Chase", "Marshall", "Ryder", "Robo-Dog", "Everest", "Tracker", "Rex")
+
+data_raw %>%
+  unnest(backup) %>%
+  mutate(season = as.numeric(season)) %>%
+  select(season, episode, overall, backup) %>%
+  count(season, backup) %>%
+  left_join(
+    data %>%
+      filter(characters %in% pups) %>%
+      count(season, characters) %>%
+      rename(appearances = n,
+             backup = characters),
+    by = c("season", "backup")
+  ) %>%
+  mutate(appearances = if_else(appearances < n, n, appearances),
+         perc_backup = n/appearances) %>% 
+  arrange(desc(perc_backup)) %>% 
+  ggplot(aes(x = season, y = perc_backup, group = backup)) +
+  geom_line(aes(colour = backup)) +
+  scale_color_manual(values = pup_colours, breaks = c(1, 2, 3, 4, 5, 6, 7, 8)) +
+  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8")) +
+  scale_y_continuous(labels = label_percent()) +
+  theme_minimal() +
+  labs(title = "Pups as backup reponders per season",
+       subtitle = "Nnmber of times as a backup responder as a percentage of total appearances",
+       x = "Season",
+       y = "Percentage of total appearances as a backup responder")
+
+```
+
+
+
+
+
+
+```{r check characters}
+data %>%
+  select(season, episode, overall, characters) %>%
+  unnest(characters) %>%
+  # filter(characters %in% pups) %>%
+  count(characters) %>%
+  arrange(desc(n)) %>% 
+  filter(str_detect(characters, "Ella"))
+```
+

@@ -9,13 +9,13 @@ data_raw %>% tabyl(episode, season)
 
 #Pups appearances
 
-pups <- c("Zuma", "Skye", "Rubble", "Rocky", "Chase", "Marshall", "Ryder")
+pups <- c("Zuma", "Skye", "Rubble", "Rocky", "Chase", "Marshall", "Ryder", "Robo-dog", "Everest", "Tracker", "Tuck", "Ella", "Rex", "Liberty")
 
 (
   appearances <- data_raw %>%
     select(season, episode, overall, characters) %>%
     unnest(characters) %>%
-    filter(!characters %in% pups) %>%
+    filter(characters %in% pups) %>%
     count(characters) %>%
     # group_by(season) %>%
     slice_max(n, n = 30) %>%
@@ -29,3 +29,19 @@ pups <- c("Zuma", "Skye", "Rubble", "Rocky", "Chase", "Marshall", "Ryder")
 )
 
 appearances %>% tabyl(characters)
+
+cum_appearances <- data_raw %>% 
+  select(overall, characters) %>%
+  unnest(characters) %>%
+  filter(characters %in% pups) %>%
+  group_by(characters) %>% 
+  mutate(appearance = 1,
+         cumsum = cumsum(appearance)) %>%
+  ungroup() %>% 
+  fill(c(overall, characters), .direction = "updown") %>%
+  print()
+
+ggplot(cum_appearances, aes(x = overall, y = cumsum, group = characters)) +
+  geom_line(aes(color = factor(characters)))
+
+fill
